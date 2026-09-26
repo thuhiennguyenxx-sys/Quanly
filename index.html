@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ thống Quản lý Bảo trì Máy thở</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-slate-50 font-sans">
+    <div class="max-w-7xl mx-auto p-4 md:p-6">
+        <!-- Header -->
+        <header class="bg-blue-600 text-white p-4 rounded-xl shadow-md mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-xl md:text-2xl font-bold">Quản Lý Bảo Trì & Thay Thế Linh Kiện Máy Thở</h1>
+                <p class="text-xs md:text-sm text-blue-100">Hệ thống tối ưu hóa biên bản kỹ sư & phòng dự án (44 Máy)</p>
+            </div>
+            <div class="space-x-2">
+                <button onclick="switchTab('engineer')" id="btn-engineer" class="px-4 py-2 bg-white text-blue-600 font-semibold rounded-lg shadow transition">Kỹ Sư (Lập Biên Bản)</button>
+                <button onclick="switchTab('project')" id="btn-project" class="px-4 py-2 bg-blue-700 text-white font-semibold rounded-lg shadow transition">Phòng Dự Án (Duyệt Kho)</button>
+            </div>
+        </header>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="mb-4 p-4 bg-emerald-100 border border-emerald-400 text-emerald-700 rounded-lg">
+                {{ message }}
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <!-- Tab 1: Giao diện Kỹ sư -->
+        <div id="tab-engineer" class="bg-white p-6 rounded-xl shadow-md mb-6">
+            <h2 class="text-lg font-bold text-slate-800 mb-4 border-b pb-2">Lập Biên Bản Kiểm Tra & Đề Xuất Thay Linh Kiện</h2>
+            <form action="/submit" method="POST" enctype="multipart/form-data" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Họ tên Kỹ sư thực hiện:</label>
+                        <input type="text" name="engineer_name" required class="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Nhập tên của bạn...">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Chọn Máy Thở (Khoa - Model - Serial):</label>
+                        <select name="machine_serial" required class="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                            <option value="">-- Chọn máy thở từ danh sách 44 máy --</option>
+                            {% for m in machines %}
+                            <option value="{{ m.department }} | {{ m.model }} | {{ m.serial }}">
+                                [{{ m.department }}] - {{ m.model }} - SN: {{ m.serial }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Nội dung / Kết quả kiểm tra tổng quan:</label>
+                    <textarea name="notes" rows="3" required class="w-full p-2.5 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Nhập kết quả kiểm tra máy..."></textarea>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Đính kèm Ảnh máy / Video linh kiện hỏng (Có thể chọn nhiều file):</label>
+                    <input type="file" name="media_files" multiple accept="image/*,video/*" class="w-full p-2 border rounded-lg bg-slate-50 text-sm">
+                </div>
+
+                <div class="border-t pt-4">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" name="has_replacement" id="has_replacement" onchange="toggleReplacement()" class="w-4 h-4 text-blue-600 rounded">
+                        <span class="font-semibold text-slate-800">Cần thay thế linh kiện hỏng?</span>
+                    </label>
+                </div>
+
+                <!-- Form thông tin linh kiện thay thế (ẩn/hiện) -->
+                <div id="replacement-section" class="hidden p-4 bg-amber-50 border border-amber-200 rounded-lg space-y-3">
+                    <h3 class="font-semibold text-amber-800 text-sm">Thông tin linh kiện đề xuất thay thế:</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Tên linh kiện:</label>
+                            <input type="text" name="parts_name" class="w-full p-2 border rounded-lg bg-white text-sm" placeholder="VD: Màng lọc, cảm biến oxy...">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Số lượng:</label>
+                            <input type="number" name="parts_qty" value="1" min="1" class="w-full p-2 border rounded-lg bg-white text-sm">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-700 mb-1">Lý do hỏng / Mô tả:</label>
+                        <input type="text" name="parts_reason" class="w-full p-2 border rounded-lg bg-white text-sm" placeholder="VD: Bị rách, hết hạn sử dụng...">
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow transition">
+                    Gửi Biên Bản Kiểm Tra
+                </button>
+            </form>
+        </div>
+
+        <!-- Tab 2: Giao diện Phòng Dự án -->
+        <div id="tab-project" class="bg-white p-6 rounded-xl shadow-md mb-6 hidden">
+            <h2 class="text-lg font-bold text-slate-800 mb-4 border-b pb-2">Danh Sách Biên Bản & Duyệt Xuất Kho</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse min-w-[900px]">
+                    <thead>
+                        <tr class="bg-slate-100 text-slate-700 text-sm">
+                            <th class="p-3 border">ID / Thời gian</th>
+                            <th class="p-3 border">Kỹ sư</th>
+                            <th class="p-3 border">Khoa / Máy / Serial</th>
+                            <th class="p-3 border">Kiểm tra</th>
+                            <th class="p-3 border">Linh kiện thay thế</th>
+                            <th class="p-3 border">Chứng cứ (Media)</th>
+                            <th class="p-3 border">Trạng thái</th>
+                            <th class="p-3 border text-center">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-sm">
+                        {% if reports %}
+                            {% for r in reports %}
+                            <tr class="hover:bg-slate-50">
+                                <td class="p-3 border">
+                                    <div class="font-bold text-slate-700">#{{ r.id }}</div>
+                                    <div class="text-xs text-slate-500 whitespace-nowrap">{{ r.created_at }}</div>
+                                </td>
+                                <td class="p-3 border font-medium">{{ r.engineer }}</td>
+                                <td class="p-3 border">
+                                    <div class="font-semibold text-blue-600">{{ r.department }}</div>
+                                    <div class="text-xs text-slate-500">{{ r.model }} - SN: {{ r.serial }}</div>
+                                </td>
+                                <td class="p-3 border">{{ r.notes }}</td>
+                                <td class="p-3 border">
+                                    {% if r.has_replacement %}
+                                        <span class="text-red-600 font-semibold">Tên: {{ r.parts_name }}</span><br>
+                                        <span class="text-xs text-slate-600">SL: {{ r.parts_qty }} | Lý do: {{ r.parts_reason }}</span>
+                                    {% else %}
+                                        <span class="text-slate-400 italic">Không có</span>
+                                    {% endif %}
+                                </td>
+                                <td class="p-3 border">
+                                    {% if r.media_list %}
+                                        <div class="flex flex-wrap gap-1">
+                                            {% for m in r.media_list %}
+                                                <a href="{{ url_for('static', filename='uploads/' + m) }}" target="_blank" class="px-2 py-1 bg-blue-50 text-blue-600 border border-blue-200 rounded text-xs underline inline-block">
+                                                    File {{ loop.index }}
+                                                </a>
+                                            {% endfor %}
+                                        </div>
+                                    {% else %}
+                                        <span class="text-slate-400 text-xs">Không có</span>
+                                    {% endif %}
+                                </td>
+                                <td class="p-3 border">
+                                    <span class="px-2 py-1 rounded text-xs font-semibold whitespace-nowrap 
+                                        {% if 'Hoàn tất' in r.status or 'Đã hoàn thành' in r.status %} bg-emerald-100 text-emerald-800 
+                                        {% else %} bg-amber-100 text-amber-800 {% endif %}">
+                                        {{ r.status }}
+                                    </span>
+                                </td>
+                                <td class="p-3 border text-center">
+                                    {% if r.has_replacement and 'Chờ duyệt' in r.status %}
+                                        <a href="/approve/{{ r.id }}" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold inline-block shadow whitespace-nowrap">
+                                            Duyệt Xuất Kho
+                                        </a>
+                                    {% else %}
+                                        <span class="text-slate-400 text-xs">-</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="8" class="p-6 text-center text-slate-400 italic">Chưa có biên bản nào được gửi lên.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleReplacement() {
+            const checkbox = document.getElementById('has_replacement');
+            const section = document.getElementById('replacement-section');
+            if (checkbox.checked) {
+                section.classList.remove('hidden');
+            } else {
+                section.classList.add('hidden');
+            }
+        }
+
+        function switchTab(tab) {
+            const btnEng = document.getElementById('btn-engineer');
+            const btnProj = document.getElementById('btn-project');
+            const tabEng = document.getElementById('tab-engineer');
+            const tabProj = document.getElementById('tab-project');
+
+            if (tab === 'engineer') {
+                btnEng.className = "px-4 py-2 bg-white text-blue-600 font-semibold rounded-lg shadow transition";
+                btnProj.className = "px-4 py-2 bg-blue-700 text-white font-semibold rounded-lg shadow transition";
+                tabEng.classList.remove('hidden');
+                tabProj.classList.add('hidden');
+            } else {
+                btnProj.className = "px-4 py-2 bg-white text-blue-600 font-semibold rounded-lg shadow transition";
+                btnEng.className = "px-4 py-2 bg-blue-700 text-white font-semibold rounded-lg shadow transition";
+                tabProj.classList.remove('hidden');
+                tabEng.classList.add('hidden');
+            }
+        }
+    </script>
+</body>
+</html>
